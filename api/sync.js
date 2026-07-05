@@ -1,4 +1,6 @@
-// api/sync.js - Complete working version
+// api/sync.js - Fixed version with node-fetch
+
+const fetch = require('node-fetch');
 
 const JSONBIN_ACCESS_KEY = process.env.JSONBIN_ACCESS_KEY;
 const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
@@ -89,7 +91,18 @@ async function updateBinData(data) {
     }
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    // Handle preflight
+    if (req.method === 'OPTIONS') {
+        return res.status(200).end();
+    }
+
+    // Only allow POST requests
     if (req.method !== 'POST') {
         return res.status(405).json({ 
             success: false, 
@@ -247,7 +260,7 @@ export default async function handler(req, res) {
             message: 'Server error: ' + error.message 
         });
     }
-}
+};
 
 function hashPassword(password) {
     let hash = 0;
