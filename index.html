@@ -621,6 +621,19 @@
         .sync-indicator .dot.syncing { background: var(--primary); animation: pulse 1s infinite; }
         .sync-indicator .dot.error { background: var(--danger); }
 
+        /* ===== PWA Install Button ===== */
+        #installBtn {
+            position: fixed;
+            bottom: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            width: auto;
+            padding: 12px 24px;
+            box-shadow: 0 8px 30px rgba(108, 99, 255, 0.3);
+            animation: slideUp 0.5s ease;
+        }
+
         /* ===== Utility ===== */
         .flex { display: flex; }
         .flex-col { flex-direction: column; }
@@ -675,6 +688,7 @@
             .color-option { width: 34px; height: 34px; }
             .record-button { width: 70px; height: 70px; }
             .sticky-grid { grid-template-columns: 1fr; }
+            #installBtn { bottom: 70px; padding: 10px 20px; font-size: 14px; }
         }
 
         @media (max-width: 360px) {
@@ -979,7 +993,6 @@
                 APP_NAME: 'Voice Journal',
                 VERSION: '1.0.0',
                 STORAGE_PREFIX: 'voiceJournal_',
-                // API endpoint - will be your Vercel URL
                 API_URL: window.location.origin + '/api/sync',
                 SYNC_INTERVAL: 30000,
                 MAX_NOTES: 1000,
@@ -1002,6 +1015,7 @@
                 lastSyncTime: null,
                 syncTimer: null,
                 isOnline: navigator.onLine,
+                deferredPrompt: null,
             };
 
             // ---------- DOM CACHE ----------
@@ -1181,7 +1195,6 @@
                             const localNotes = AppState.notes || [];
                             const cloudNotes = data.notes;
                             
-                            // Use cloud data if it's newer or has more notes
                             if (cloudNotes.length > localNotes.length || 
                                 (cloudNotes.length > 0 && localNotes.length > 0 && 
                                  new Date(cloudNotes[0].createdAt) > new Date(localNotes[0].createdAt))) {
@@ -1290,7 +1303,6 @@
                     DOM.loginBtn.disabled = true;
                     DOM.loginBtn.textContent = 'Logging in...';
 
-                    // Check with server first
                     const result = await callAPI('login', {
                         username: username,
                         password: password
@@ -2123,6 +2135,60 @@
                 showToast(AppState.isOnline ? 'Back online' : 'Offline mode', 'info');
             }
 
+            // ---------- PWA INSTALLATION ----------
+            function setupPWA() {
+                // Register Service Worker
+                if ('serviceWorker' in navigator) {
+                    window.addEventListener('load', () => {
+                        navigator.serviceWorker.register('/sw.js')
+                            .then(registration => {
+                                console.log('✅ Service Worker registered successfully');
+                            })
+                            .catch(err => {
+                                console.log('❌ Service Worker registration failed:', err);
+                            });
+                    });
+                }
+
+                // Install prompt
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    e.preventDefault();
+                    AppState.deferredPrompt = e;
+                    console.log('📱 PWA install prompt available');
+                    showInstallButton();
+                });
+
+                window.addEventListener('appinstalled', () => {
+                    const btn = document.getElementById('installBtn');
+                    if (btn) btn.remove();
+                    AppState.deferredPrompt = null;
+                    console.log('📱 App installed successfully!');
+                    showToast('App installed successfully!', 'success');
+                });
+            }
+
+            function showInstallButton() {
+                const existingBtn = document.getElementById('installBtn');
+                if (existingBtn) return;
+                
+                const installBtn = document.createElement('button');
+                installBtn.id = 'installBtn';
+                installBtn.className = 'btn-primary';
+                installBtn.textContent = '📱 Install App';
+                installBtn.onclick = async () => {
+                    if (AppState.deferredPrompt) {
+                        AppState.deferredPrompt.prompt();
+                        const result = await AppState.deferredPrompt.userChoice;
+                        console.log('User choice:', result.outcome);
+                        if (result.outcome === 'accepted') {
+                            installBtn.remove();
+                        }
+                        AppState.deferredPrompt = null;
+                    }
+                };
+                document.body.appendChild(installBtn);
+            }
+
             // ---------- INITIALIZATION ----------
             function init() {
                 // Auth tabs
@@ -2212,7 +2278,10 @@
                     }
                 });
 
-                // Initialize
+                // Initialize PWA
+                setupPWA();
+
+                // Initialize date
                 updateDateTime();
                 setInterval(updateDateTime, 60000);
 
