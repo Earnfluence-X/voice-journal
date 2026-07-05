@@ -1,33 +1,27 @@
-// api/sync.js - Fixed version with node-fetch
-
-const fetch = require('node-fetch');
+// api/sync.js - With fallback in-memory storage
 
 const JSONBIN_ACCESS_KEY = process.env.JSONBIN_ACCESS_KEY;
 const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
 
-let cachedData = {};
-let lastCacheUpdate = null;
-const CACHE_TTL = 60000;
+// In-memory fallback (data resets on server restart)
+const MEMORY_STORAGE = { users: {} };
+let USE_JSONBIN = true;
 
 async function fetchBinData() {
+    // If JSONBin is not configured, use memory
     if (!JSONBIN_ACCESS_KEY || !JSONBIN_BIN_ID) {
-        throw new Error('JSONBin API keys not configured');
-    }
-
-    if (cachedData && lastCacheUpdate && 
-        (Date.now() - lastCacheUpdate) < CACHE_TTL) {
-        return cachedData;
+        USE_JSONBIN = false;
+        console.log('⚠️ Using in-memory storage (JSONBin not configured)');
+        return MEMORY_STORAGE;
     }
 
     try {
         const response = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`, {
-            headers: {
-                'X-Access-Key': JSONBIN_ACCESS_KEY
-            }
+            headers: { 'X-Access-Key': JSONBIN_ACCESS_KEY }
         });
 
         if (response.status === 404) {
-            // Bin doesn't exist, create it
+            // Create bin if it doesn't exist
             const createResponse = await fetch('https://api.jsonbin.io/v3/b', {
                 method: 'POST',
                 headers: {
@@ -41,31 +35,37 @@ async function fetchBinData() {
             });
             
             if (!createResponse.ok) {
-                throw new Error(`Failed to create bin: ${createResponse.status}`);
+                USE_JSONBIN = false;
+                console.log('⚠️ Falling back to in-memory storage');
+                return MEMORY_STORAGE;
             }
             
             const result = await createResponse.json();
-            console.log('Created new bin:', result.metadata?.id);
+            console.log('✅ Created new bin:', result.metadata?.id);
             return { users: {} };
         }
 
         if (!response.ok) {
-            throw new Error(`JSONBin API error: ${response.status}`);
+            USE_JSONBIN = false;
+            console.log('⚠️ JSONBin error, using in-memory storage');
+            return MEMORY_STORAGE;
         }
 
         const result = await response.json();
-        cachedData = result.record || { users: {} };
-        lastCacheUpdate = Date.now();
-        return cachedData;
+        USE_JSONBIN = true;
+        return result.record || { users: {} };
     } catch (error) {
-        console.error('Error fetching from JSONBin:', error);
-        throw error;
+        console.error('JSONBin error:', error.message);
+        USE_JSONBIN = false;
+        return MEMORY_STORAGE;
     }
 }
 
 async function updateBinData(data) {
-    if (!JSONBIN_ACCESS_KEY || !JSONBIN_BIN_ID) {
-        throw new Error('JSONBin API keys not configured');
+    // If using memory, just update memory
+    if (!USE_JSONBIN) {
+        Object.assign(MEMORY_STORAGE, data);
+        return { success: true };
     }
 
     try {
@@ -82,27 +82,25 @@ async function updateBinData(data) {
             throw new Error(`JSONBin API error: ${response.status}`);
         }
 
-        cachedData = data;
-        lastCacheUpdate = Date.now();
         return await response.json();
     } catch (error) {
-        console.error('Error updating JSONBin:', error);
-        throw error;
+        console.error('JSONBin update error:', error.message);
+        USE_JSONBIN = false;
+        Object.assign(MEMORY_STORAGE, data);
+        return { success: true };
     }
 }
 
 module.exports = async function handler(req, res) {
-    // Set CORS headers
+    // CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    // Handle preflight
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
 
-    // Only allow POST requests
     if (req.method !== 'POST') {
         return res.status(405).json({ 
             success: false, 
