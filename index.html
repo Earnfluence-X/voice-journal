@@ -1,0 +1,2240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Voice Journal</title>
+    
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#6C63FF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="Your personal voice notes & journal app">
+    
+    <style>
+        /* ===== CSS Variables ===== */
+        :root {
+            --primary: #6C63FF;
+            --primary-dark: #5A52D5;
+            --primary-light: #8B83FF;
+            --primary-rgb: 108, 99, 255;
+            --secondary: #F8F4FF;
+            --accent: #FF6584;
+            --text-primary: #2D2D3A;
+            --text-secondary: #6B6B7A;
+            --text-light: #9B9BAA;
+            --background: #FFFFFF;
+            --card-bg: #FBF9FF;
+            --card-shadow: 0 4px 20px rgba(108, 99, 255, 0.08);
+            --border-color: #E8E3F5;
+            --success: #4CAF50;
+            --danger: #FF6B6B;
+            --warning: #FFB74D;
+            --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --border-radius: 16px;
+            --border-radius-sm: 12px;
+            --transition-speed: 0.3s;
+            --max-width: 430px;
+            --shadow-lg: 0 8px 40px rgba(108, 99, 255, 0.12);
+        }
+
+        /* Dark Mode */
+        [data-theme="dark"] {
+            --background: #1A1A2E;
+            --card-bg: #252540;
+            --text-primary: #F0F0F5;
+            --text-secondary: #B8B8C8;
+            --text-light: #8A8A9A;
+            --border-color: #3A3A55;
+            --secondary: #2A2A44;
+            --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        /* ===== Reset ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: var(--font-family);
+            font-size: 16px;
+            background: var(--background);
+            color: var(--text-primary);
+            transition: all var(--transition-speed) ease;
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 16px;
+            min-height: 100vh;
+            min-height: 100dvh;
+            overflow-x: hidden;
+        }
+
+        /* ===== Scrollbar ===== */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: var(--secondary); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
+
+        /* ===== Typography ===== */
+        h1 { font-size: clamp(24px, 5vw, 28px); font-weight: 700; }
+        h3 { font-size: clamp(17px, 3.5vw, 18px); font-weight: 600; }
+        h4 { font-size: clamp(15px, 3vw, 16px); font-weight: 500; }
+        p { font-size: 15px; line-height: 1.6; color: var(--text-secondary); }
+
+        /* ===== Auth Screens ===== */
+        #authScreen {
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        #authScreen.hidden {
+            display: none;
+        }
+
+        .auth-container {
+            width: 100%;
+            max-width: 400px;
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 40px 30px;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+            animation: slideUp 0.4s ease;
+        }
+
+        .auth-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .auth-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+        }
+
+        .auth-icon svg {
+            width: 40px;
+            height: 40px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .auth-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .auth-subtitle {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 24px;
+            border-radius: var(--border-radius-sm);
+            overflow: hidden;
+            border: 2px solid var(--border-color);
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: var(--background);
+            color: var(--text-secondary);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            font-family: var(--font-family);
+        }
+
+        .auth-tab.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .auth-tab:hover:not(.active) {
+            background: var(--secondary);
+        }
+
+        /* ===== Form Elements ===== */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border-color);
+            border-radius: var(--border-radius-sm);
+            font-size: 15px;
+            background: var(--background);
+            color: var(--text-primary);
+            transition: all var(--transition-speed) ease;
+            font-family: var(--font-family);
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(var(--primary-rgb), 0.1);
+        }
+
+        .form-group input::placeholder {
+            color: var(--text-light);
+        }
+
+        .color-picker-group {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .color-option {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 3px solid transparent;
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            position: relative;
+        }
+
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+
+        .color-option.selected {
+            border-color: var(--text-primary);
+            box-shadow: 0 0 0 2px var(--background), 0 0 0 4px var(--text-primary);
+        }
+
+        .color-option.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        /* ===== Buttons ===== */
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: var(--border-radius-sm);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-family: var(--font-family);
+            min-height: 48px;
+            width: 100%;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: scale(1.02);
+            box-shadow: 0 6px 25px rgba(var(--primary-rgb), 0.3);
+        }
+
+        .btn-primary:active {
+            transform: scale(0.97);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--secondary);
+            color: var(--primary);
+            border: 2px solid var(--primary);
+            padding: 10px 20px;
+            border-radius: var(--border-radius-sm);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            font-family: var(--font-family);
+            min-height: 44px;
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: var(--border-radius-sm);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            font-family: var(--font-family);
+            min-height: 44px;
+        }
+
+        .btn-danger:hover {
+            background: #E55A5A;
+        }
+
+        .btn-icon {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 8px;
+            transition: all var(--transition-speed) ease;
+            color: var(--text-secondary);
+            min-width: 40px;
+            min-height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .btn-icon:hover {
+            background: var(--secondary);
+            color: var(--primary);
+        }
+
+        .auth-error {
+            color: var(--danger);
+            font-size: 14px;
+            margin-top: 12px;
+            text-align: center;
+            display: none;
+            padding: 8px;
+            background: rgba(255, 107, 107, 0.1);
+            border-radius: 8px;
+        }
+
+        .auth-error.show {
+            display: block;
+            animation: shake 0.4s ease;
+        }
+
+        .auth-success {
+            color: var(--success);
+            font-size: 14px;
+            margin-top: 12px;
+            text-align: center;
+            display: none;
+            padding: 8px;
+            background: rgba(76, 175, 80, 0.1);
+            border-radius: 8px;
+        }
+
+        .auth-success.show {
+            display: block;
+        }
+
+        .auth-switch {
+            text-align: center;
+            margin-top: 16px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .auth-switch a {
+            color: var(--primary);
+            cursor: pointer;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .auth-switch a:hover {
+            text-decoration: underline;
+        }
+
+        /* ===== Main App ===== */
+        #appContainer {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        #appContainer.visible {
+            display: block;
+        }
+
+        /* ===== Navigation ===== */
+        .navbar {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 8px 0;
+            border-top: 1px solid var(--border-color);
+            margin-top: 20px;
+            background: var(--background);
+            position: sticky;
+            bottom: 0;
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            background: none;
+            border: none;
+            color: var(--text-light);
+            cursor: pointer;
+            padding: 6px 12px;
+            border-radius: var(--border-radius-sm);
+            transition: all var(--transition-speed) ease;
+            font-size: 11px;
+            font-weight: 500;
+            font-family: var(--font-family);
+            min-width: 56px;
+        }
+
+        .nav-item:hover {
+            color: var(--primary);
+            background: var(--secondary);
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        .nav-icon {
+            width: 22px;
+            height: 22px;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+        }
+
+        /* ===== Cards ===== */
+        .card {
+            background: var(--card-bg);
+            border-radius: var(--border-radius);
+            padding: 16px;
+            margin-bottom: 12px;
+            box-shadow: var(--card-shadow);
+            border: 1px solid var(--border-color);
+            transition: all var(--transition-speed) ease;
+            cursor: pointer;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* ===== Recording Button ===== */
+        .record-button {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: none;
+            color: white;
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            box-shadow: 0 8px 30px rgba(255, 101, 132, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .record-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 40px rgba(255, 101, 132, 0.4);
+        }
+
+        .record-button.recording {
+            animation: pulse 1.5s infinite;
+            background: var(--danger);
+        }
+
+        .record-button svg {
+            width: 32px;
+            height: 32px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        /* ===== Tags ===== */
+        .tag {
+            display: inline-block;
+            padding: 4px 12px;
+            background: var(--secondary);
+            color: var(--primary);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            margin: 2px 4px 2px 0;
+        }
+
+        /* ===== Sticky Notes ===== */
+        .sticky-yellow { background: #FFF9C4; border-color: #F9A825; }
+        .sticky-green { background: #C8E6C9; border-color: #388E3C; }
+        .sticky-blue { background: #BBDEFB; border-color: #1976D2; }
+        .sticky-pink { background: #F8BBD0; border-color: #C2185B; }
+
+        .sticky-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+        }
+
+        /* ===== Modals ===== */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-overlay.hidden {
+            display: none;
+        }
+
+        .modal-content {
+            background: var(--background);
+            border-radius: var(--border-radius);
+            padding: 24px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease;
+        }
+
+        /* ===== Toast ===== */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2000;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .toast {
+            padding: 12px 20px;
+            border-radius: var(--border-radius-sm);
+            color: white;
+            font-weight: 500;
+            margin-bottom: 8px;
+            animation: slideDown 0.3s ease;
+            box-shadow: var(--shadow-lg);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .toast-success { background: var(--success); }
+        .toast-error { background: var(--danger); }
+        .toast-info { background: var(--primary); }
+        .toast-warning { background: var(--warning); color: var(--text-primary); }
+
+        .toast-close {
+            background: none;
+            border: none;
+            color: inherit;
+            cursor: pointer;
+            margin-left: auto;
+            padding: 4px;
+            opacity: 0.7;
+        }
+
+        /* ===== Sync Indicator ===== */
+        .sync-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-light);
+            padding: 4px 12px;
+            background: var(--secondary);
+            border-radius: 20px;
+        }
+
+        .sync-indicator .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .sync-indicator .dot.synced { background: var(--success); }
+        .sync-indicator .dot.syncing { background: var(--primary); animation: pulse 1s infinite; }
+        .sync-indicator .dot.error { background: var(--danger); }
+
+        /* ===== Utility ===== */
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-between { justify-content: space-between; }
+        .gap-1 { gap: 8px; }
+        .gap-2 { gap: 16px; }
+        .mt-1 { margin-top: 8px; }
+        .mt-2 { margin-top: 16px; }
+        .mb-1 { margin-bottom: 8px; }
+        .mb-2 { margin-bottom: 16px; }
+        .w-full { width: 100%; }
+        .text-center { text-align: center; }
+        .text-sm { font-size: 14px; }
+        .text-xs { font-size: 12px; }
+        .text-light { color: var(--text-light); }
+        .text-secondary { color: var(--text-secondary); }
+        .hidden { display: none !important; }
+
+        /* ===== Animations ===== */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            75% { transform: translateX(8px); }
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 480px) {
+            body { padding: 12px; }
+            .auth-container { padding: 30px 20px; }
+            .color-picker-group { grid-template-columns: repeat(6, 1fr); gap: 8px; }
+            .color-option { width: 34px; height: 34px; }
+            .record-button { width: 70px; height: 70px; }
+            .sticky-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 360px) {
+            .color-picker-group { grid-template-columns: repeat(3, 1fr); }
+            .nav-item { font-size: 10px; min-width: 44px; }
+            .nav-icon { width: 18px; height: 18px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+        }
+
+        :focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+<body>
+    <!-- ===== TOAST CONTAINER ===== -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- ===== AUTH SCREEN ===== -->
+    <div id="authScreen">
+        <div class="auth-container">
+            <div class="auth-header">
+                <div class="auth-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <path d="M12 19v3"/>
+                        <path d="M8 21h8"/>
+                    </svg>
+                </div>
+                <h1 class="auth-title">Voice Journal</h1>
+                <p class="auth-subtitle">Your personal voice notes &amp; journal</p>
+            </div>
+
+            <div class="auth-tabs" role="tablist">
+                <button class="auth-tab active" data-tab="login" role="tab" aria-selected="true">Log In</button>
+                <button class="auth-tab" data-tab="signup" role="tab" aria-selected="false">Sign Up</button>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form">
+                <div class="form-group">
+                    <label for="loginUsername">Username</label>
+                    <input type="text" id="loginUsername" placeholder="Enter your username" required autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" placeholder="Enter your password" required autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn-primary" id="loginBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <path d="M12 19v3"/>
+                        <path d="M8 21h8"/>
+                    </svg>
+                    Log In
+                </button>
+                <div id="loginError" class="auth-error" role="alert"></div>
+                <div class="auth-switch">
+                    Don't have an account? <a id="switchToSignup">Sign Up</a>
+                </div>
+            </form>
+
+            <!-- Signup Form -->
+            <form id="signupForm" class="auth-form hidden">
+                <div class="form-group">
+                    <label for="signupUsername">Choose Username</label>
+                    <input type="text" id="signupUsername" placeholder="Choose a unique username" required autocomplete="off">
+                    <div class="text-xs text-light mt-1">Username must be at least 3 characters</div>
+                </div>
+                <div class="form-group">
+                    <label for="signupPassword">Create Password</label>
+                    <input type="password" id="signupPassword" placeholder="Create a strong password" required autocomplete="new-password">
+                    <div class="text-xs text-light mt-1">Password must be at least 6 characters</div>
+                </div>
+                <div class="form-group">
+                    <label for="signupConfirmPassword">Confirm Password</label>
+                    <input type="password" id="signupConfirmPassword" placeholder="Confirm your password" required autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label>Choose Your Theme Color</label>
+                    <div class="color-picker-group" id="colorPicker">
+                        <div class="color-option selected" style="background: #6C63FF" data-color="#6C63FF"></div>
+                        <div class="color-option" style="background: #FF6584" data-color="#FF6584"></div>
+                        <div class="color-option" style="background: #4CAF50" data-color="#4CAF50"></div>
+                        <div class="color-option" style="background: #FF9800" data-color="#FF9800"></div>
+                        <div class="color-option" style="background: #9C27B0" data-color="#9C27B0"></div>
+                        <div class="color-option" style="background: #00BCD4" data-color="#00BCD4"></div>
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary" id="signupBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    Create Account
+                </button>
+                <div id="signupError" class="auth-error" role="alert"></div>
+                <div id="signupSuccess" class="auth-success" role="status"></div>
+                <div class="auth-switch">
+                    Already have an account? <a id="switchToLogin">Log In</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===== MAIN APP ===== -->
+    <div id="appContainer">
+        <header class="flex items-center justify-between mb-2">
+            <div>
+                <h1 id="appTitle">Voice Journal</h1>
+                <p class="text-sm text-secondary" id="userGreeting">Welcome back!</p>
+            </div>
+            <div class="flex gap-1 items-center">
+                <span class="sync-indicator" id="syncIndicator">
+                    <span class="dot synced" id="syncDot"></span>
+                    <span id="syncText">Synced</span>
+                </span>
+                <button class="btn-icon" id="logoutBtn" aria-label="Logout">
+                    <svg class="nav-icon" viewBox="0 0 24 24">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                </button>
+                <button class="btn-icon" id="themeToggle" aria-label="Toggle dark mode">
+                    <svg class="nav-icon" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="5"/>
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <div class="mb-2">
+            <p class="text-sm text-secondary" id="greeting">Good Morning!</p>
+            <p class="text-sm text-light" id="currentDate">Loading...</p>
+        </div>
+
+        <div class="card text-center">
+            <div class="flex flex-col items-center gap-2">
+                <button class="record-button" id="recordBtn" aria-label="Start or stop recording">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                        <path d="M12 19v3"/>
+                        <path d="M8 21h8"/>
+                    </svg>
+                </button>
+                <h3>Tap to Record Voice Note</h3>
+                <p class="text-sm text-secondary">or type your thoughts</p>
+                <div class="flex gap-2 mt-1">
+                    <button class="btn-secondary" id="voiceBtn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            <path d="M12 19v3"/>
+                            <path d="M8 21h8"/>
+                        </svg>
+                        Voice
+                    </button>
+                    <button class="btn-secondary" id="typeBtn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+                            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+                            <path d="M2 2l7.586 7.586"/>
+                            <circle cx="11" cy="11" r="2"/>
+                        </svg>
+                        Type
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center justify-between mt-2">
+            <h3 id="sectionTitle">Recent Entries</h3>
+            <button class="btn-icon text-sm text-light" id="viewAllBtn">View All →</button>
+        </div>
+
+        <div id="contentArea"></div>
+
+        <div class="card flex items-center justify-between" id="statsCard">
+            <div>
+                <p class="text-xs text-light">This Week</p>
+                <p class="h3" id="totalNotes">0 notes</p>
+            </div>
+            <div class="text-center">
+                <p class="text-xs text-light">Voice Notes</p>
+                <p class="h3" id="voiceNotesCount">0</p>
+            </div>
+            <div>
+                <p class="text-xs text-light">Streak</p>
+                <p class="h3" id="streakCount">0 days</p>
+            </div>
+        </div>
+
+        <nav class="navbar" role="navigation">
+            <button class="nav-item active" data-page="home">
+                <svg class="nav-icon" viewBox="0 0 24 24">
+                    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1"/>
+                </svg>
+                <span>Home</span>
+            </button>
+            <button class="nav-item" data-page="journal">
+                <svg class="nav-icon" viewBox="0 0 24 24">
+                    <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+                </svg>
+                <span>Journal</span>
+            </button>
+            <button class="nav-item" data-page="sticky">
+                <svg class="nav-icon" viewBox="0 0 24 24">
+                    <path d="M12 2a3 3 0 0 1 3 3v11a3 3 0 1 1-6 0V5a3 3 0 0 1 3-3z"/>
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                    <path d="M12 19v3"/>
+                    <path d="M8 21h8"/>
+                </svg>
+                <span>Sticky</span>
+            </button>
+            <button class="nav-item" data-page="settings">
+                <svg class="nav-icon" viewBox="0 0 24 24">
+                    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                </svg>
+                <span>Settings</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- ===== MODALS ===== -->
+    <div id="noteModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="flex items-center justify-between mb-2">
+                <h3 id="modalTitle">New Note</h3>
+                <button class="btn-icon" id="closeModal">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <form id="noteForm">
+                <div class="form-group">
+                    <label for="noteTitle">Title</label>
+                    <input type="text" id="noteTitle" class="input-field" placeholder="Note title...">
+                </div>
+                <div class="form-group">
+                    <label for="noteContent">Content</label>
+                    <textarea id="noteContent" class="input-field" placeholder="Write your thoughts..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="noteTags">Tags (comma separated)</label>
+                    <input type="text" id="noteTags" class="input-field" placeholder="work, ideas, personal">
+                </div>
+                <div class="flex gap-2">
+                    <button type="submit" class="btn-primary w-full">Save Note</button>
+                    <button type="button" class="btn-secondary" id="cancelNote">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="viewNoteModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <div class="flex items-center justify-between mb-2">
+                <h3 id="viewNoteTitle">Note</h3>
+                <button class="btn-icon" id="closeViewModal">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            </div>
+            <div id="viewNoteContent">
+                <p class="text-sm text-secondary" id="viewNoteDate"></p>
+                <p id="viewNoteText" class="mt-2" style="white-space: pre-wrap;"></p>
+                <div id="viewNoteTags" class="mt-2"></div>
+            </div>
+            <div class="flex gap-2 mt-3 flex-wrap">
+                <button class="btn-secondary" id="editNoteBtn">Edit</button>
+                <button class="btn-danger" id="deleteNoteBtn">Delete</button>
+                <button class="btn-primary" id="exportNoteBtn">Export</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // COMPLETE APPLICATION WITH VERCEL BACKEND
+        // ============================================
+
+        (function() {
+            'use strict';
+
+            // ---------- CONFIGURATION ----------
+            const CONFIG = {
+                APP_NAME: 'Voice Journal',
+                VERSION: '1.0.0',
+                STORAGE_PREFIX: 'voiceJournal_',
+                // API endpoint - will be your Vercel URL
+                API_URL: window.location.origin + '/api/sync',
+                SYNC_INTERVAL: 30000,
+                MAX_NOTES: 1000,
+                MIN_PASSWORD_LENGTH: 6,
+                MIN_USERNAME_LENGTH: 3,
+                TOAST_DURATION: 3000,
+            };
+
+            // ---------- STATE ----------
+            const AppState = {
+                currentUser: null,
+                notes: [],
+                currentPage: 'home',
+                editingNoteId: null,
+                viewingNoteId: null,
+                isRecording: false,
+                isDarkMode: false,
+                isInitialized: false,
+                syncStatus: 'synced',
+                lastSyncTime: null,
+                syncTimer: null,
+                isOnline: navigator.onLine,
+            };
+
+            // ---------- DOM CACHE ----------
+            const DOM = {
+                authScreen: document.getElementById('authScreen'),
+                appContainer: document.getElementById('appContainer'),
+                loginForm: document.getElementById('loginForm'),
+                signupForm: document.getElementById('signupForm'),
+                loginUsername: document.getElementById('loginUsername'),
+                loginPassword: document.getElementById('loginPassword'),
+                signupUsername: document.getElementById('signupUsername'),
+                signupPassword: document.getElementById('signupPassword'),
+                signupConfirmPassword: document.getElementById('signupConfirmPassword'),
+                loginError: document.getElementById('loginError'),
+                signupError: document.getElementById('signupError'),
+                signupSuccess: document.getElementById('signupSuccess'),
+                loginBtn: document.getElementById('loginBtn'),
+                signupBtn: document.getElementById('signupBtn'),
+                switchToSignup: document.getElementById('switchToSignup'),
+                switchToLogin: document.getElementById('switchToLogin'),
+                authTabs: document.querySelectorAll('.auth-tab'),
+                contentArea: document.getElementById('contentArea'),
+                sectionTitle: document.getElementById('sectionTitle'),
+                viewAllBtn: document.getElementById('viewAllBtn'),
+                totalNotes: document.getElementById('totalNotes'),
+                voiceNotesCount: document.getElementById('voiceNotesCount'),
+                streakCount: document.getElementById('streakCount'),
+                appTitle: document.getElementById('appTitle'),
+                userGreeting: document.getElementById('userGreeting'),
+                greeting: document.getElementById('greeting'),
+                currentDate: document.getElementById('currentDate'),
+                recordBtn: document.getElementById('recordBtn'),
+                voiceBtn: document.getElementById('voiceBtn'),
+                typeBtn: document.getElementById('typeBtn'),
+                logoutBtn: document.getElementById('logoutBtn'),
+                themeToggle: document.getElementById('themeToggle'),
+                noteModal: document.getElementById('noteModal'),
+                noteForm: document.getElementById('noteForm'),
+                noteTitle: document.getElementById('noteTitle'),
+                noteContent: document.getElementById('noteContent'),
+                noteTags: document.getElementById('noteTags'),
+                modalTitle: document.getElementById('modalTitle'),
+                closeModal: document.getElementById('closeModal'),
+                cancelNote: document.getElementById('cancelNote'),
+                viewNoteModal: document.getElementById('viewNoteModal'),
+                viewNoteTitle: document.getElementById('viewNoteTitle'),
+                viewNoteDate: document.getElementById('viewNoteDate'),
+                viewNoteText: document.getElementById('viewNoteText'),
+                viewNoteTags: document.getElementById('viewNoteTags'),
+                closeViewModal: document.getElementById('closeViewModal'),
+                editNoteBtn: document.getElementById('editNoteBtn'),
+                deleteNoteBtn: document.getElementById('deleteNoteBtn'),
+                exportNoteBtn: document.getElementById('exportNoteBtn'),
+                toastContainer: document.getElementById('toastContainer'),
+                navItems: document.querySelectorAll('.nav-item'),
+                colorPicker: document.getElementById('colorPicker'),
+                syncIndicator: document.getElementById('syncIndicator'),
+                syncDot: document.getElementById('syncDot'),
+                syncText: document.getElementById('syncText'),
+            };
+
+            // ---------- TOAST SYSTEM ----------
+            function showToast(message, type = 'info', duration = CONFIG.TOAST_DURATION) {
+                const toast = document.createElement('div');
+                toast.className = `toast toast-${type}`;
+                toast.setAttribute('role', 'alert');
+                
+                const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
+                toast.innerHTML = `
+                    <span>${icons[type] || 'ℹ'}</span>
+                    <span style="flex:1;">${message}</span>
+                    <button class="toast-close">×</button>
+                `;
+                
+                DOM.toastContainer.appendChild(toast);
+                toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
+                
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.style.opacity = '0';
+                        toast.style.transform = 'translateY(-10px)';
+                        setTimeout(() => toast.remove(), 300);
+                    }
+                }, duration);
+            }
+
+            // ---------- STORAGE HELPERS ----------
+            function saveToStorage(key, data) {
+                try {
+                    localStorage.setItem(CONFIG.STORAGE_PREFIX + key, JSON.stringify(data));
+                    return true;
+                } catch (e) { return false; }
+            }
+
+            function getFromStorage(key, defaultValue = null) {
+                try {
+                    const data = localStorage.getItem(CONFIG.STORAGE_PREFIX + key);
+                    return data ? JSON.parse(data) : defaultValue;
+                } catch (e) { return defaultValue; }
+            }
+
+            // ---------- API HELPERS ----------
+            async function callAPI(action, data) {
+                try {
+                    const response = await fetch(CONFIG.API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            action: action,
+                            ...data,
+                            username: AppState.currentUser?.username
+                        })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error('API error: ' + response.status);
+                    }
+
+                    return await response.json();
+                } catch (e) {
+                    console.error('API call error:', e);
+                    throw e;
+                }
+            }
+
+            // ---------- CLOUD SYNC ----------
+            async function syncToCloud() {
+                if (!AppState.currentUser) return false;
+                
+                try {
+                    updateSyncStatus('syncing');
+                    
+                    const data = {
+                        action: 'sync',
+                        username: AppState.currentUser.username,
+                        password: AppState.currentUser.password,
+                        notes: AppState.notes,
+                        stickies: getFromStorage('stickies_' + AppState.currentUser.username, []),
+                        color: AppState.currentUser.color,
+                    };
+
+                    const result = await callAPI('sync', data);
+                    
+                    if (result.success) {
+                        AppState.lastSyncTime = new Date();
+                        updateSyncStatus('synced');
+                        showToast('Synced to cloud!', 'success', 2000);
+                        return true;
+                    } else {
+                        throw new Error(result.message || 'Sync failed');
+                    }
+                } catch (e) {
+                    console.error('Sync error:', e);
+                    updateSyncStatus('error');
+                    showToast('Sync failed: ' + e.message, 'warning');
+                    return false;
+                }
+            }
+
+            async function syncFromCloud() {
+                if (!AppState.currentUser) return false;
+                
+                try {
+                    updateSyncStatus('syncing');
+                    
+                    const result = await callAPI('load', {
+                        username: AppState.currentUser.username,
+                        password: AppState.currentUser.password
+                    });
+
+                    if (result.success && result.data) {
+                        const data = result.data;
+                        
+                        if (data.notes && Array.isArray(data.notes)) {
+                            const localNotes = AppState.notes || [];
+                            const cloudNotes = data.notes;
+                            
+                            // Use cloud data if it's newer or has more notes
+                            if (cloudNotes.length > localNotes.length || 
+                                (cloudNotes.length > 0 && localNotes.length > 0 && 
+                                 new Date(cloudNotes[0].createdAt) > new Date(localNotes[0].createdAt))) {
+                                AppState.notes = cloudNotes;
+                                saveNotes();
+                                showToast('Synced ' + cloudNotes.length + ' notes from cloud!', 'success', 2000);
+                            }
+                        }
+                        
+                        if (data.stickies) {
+                            saveToStorage('stickies_' + AppState.currentUser.username, data.stickies);
+                        }
+                        
+                        if (data.color) {
+                            AppState.currentUser.color = data.color;
+                            saveToStorage('user', AppState.currentUser);
+                            updateUIForUser();
+                        }
+                        
+                        AppState.lastSyncTime = new Date();
+                        updateSyncStatus('synced');
+                        return true;
+                    } else {
+                        throw new Error(result.message || 'Load failed');
+                    }
+                } catch (e) {
+                    console.error('Sync from cloud error:', e);
+                    updateSyncStatus('error');
+                    showToast('Could not load from cloud: ' + e.message, 'warning');
+                    return false;
+                }
+            }
+
+            function updateSyncStatus(status) {
+                AppState.syncStatus = status;
+                const dot = DOM.syncDot;
+                const text = DOM.syncText;
+                
+                dot.className = 'dot';
+                if (status === 'synced') {
+                    dot.classList.add('synced');
+                    text.textContent = 'Synced';
+                } else if (status === 'syncing') {
+                    dot.classList.add('syncing');
+                    text.textContent = 'Syncing...';
+                } else if (status === 'error') {
+                    dot.classList.add('error');
+                    text.textContent = 'Error';
+                }
+            }
+
+            function startAutoSync() {
+                if (AppState.syncTimer) clearInterval(AppState.syncTimer);
+                AppState.syncTimer = setInterval(() => {
+                    if (AppState.currentUser && AppState.isOnline) {
+                        syncToCloud();
+                    }
+                }, CONFIG.SYNC_INTERVAL);
+            }
+
+            function stopAutoSync() {
+                if (AppState.syncTimer) {
+                    clearInterval(AppState.syncTimer);
+                    AppState.syncTimer = null;
+                }
+            }
+
+            // ---------- AUTHENTICATION ----------
+            function initializeAuth() {
+                try {
+                    const savedUser = getFromStorage('user');
+                    if (savedUser && savedUser.username) {
+                        AppState.currentUser = savedUser;
+                        showApp();
+                        updateUIForUser();
+                        loadNotes();
+                        loadThemePreference();
+                        if (AppState.isOnline) {
+                            setTimeout(() => syncFromCloud(), 1000);
+                        }
+                        return true;
+                    }
+                } catch (e) {
+                    console.error('Auth init error:', e);
+                }
+                return false;
+            }
+
+            async function handleLogin(e) {
+                e.preventDefault();
+                
+                const username = DOM.loginUsername.value.trim();
+                const password = DOM.loginPassword.value.trim();
+
+                if (!username || username.length < CONFIG.MIN_USERNAME_LENGTH) {
+                    showLoginError('Username must be at least ' + CONFIG.MIN_USERNAME_LENGTH + ' characters');
+                    return;
+                }
+
+                if (!password || password.length < CONFIG.MIN_PASSWORD_LENGTH) {
+                    showLoginError('Password must be at least ' + CONFIG.MIN_PASSWORD_LENGTH + ' characters');
+                    return;
+                }
+
+                try {
+                    DOM.loginBtn.disabled = true;
+                    DOM.loginBtn.textContent = 'Logging in...';
+
+                    // Check with server first
+                    const result = await callAPI('login', {
+                        username: username,
+                        password: password
+                    });
+
+                    if (!result.success) {
+                        showLoginError(result.message || 'Invalid username or password');
+                        return;
+                    }
+
+                    const user = {
+                        username: username,
+                        password: password,
+                        color: result.data?.color || '#6C63FF'
+                    };
+
+                    AppState.currentUser = user;
+                    saveToStorage('user', user);
+                    showApp();
+                    updateUIForUser();
+                    loadNotes();
+                    loadThemePreference();
+                    
+                    if (AppState.isOnline) {
+                        await syncFromCloud();
+                    }
+                    
+                    showToast('Welcome back, ' + username + '!', 'success');
+                    DOM.loginForm.reset();
+                } catch (e) {
+                    console.error('Login error:', e);
+                    showLoginError('Server error. Please try again.');
+                } finally {
+                    DOM.loginBtn.disabled = false;
+                    DOM.loginBtn.innerHTML = `
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/>
+                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                            <path d="M12 19v3"/>
+                            <path d="M8 21h8"/>
+                        </svg>
+                        Log In
+                    `;
+                }
+            }
+
+            async function handleSignup(e) {
+                e.preventDefault();
+                
+                const username = DOM.signupUsername.value.trim();
+                const password = DOM.signupPassword.value.trim();
+                const confirmPassword = DOM.signupConfirmPassword.value.trim();
+                const colorEl = document.querySelector('.color-option.selected');
+                const color = colorEl ? colorEl.dataset.color : '#6C63FF';
+
+                if (!username || username.length < CONFIG.MIN_USERNAME_LENGTH) {
+                    showSignupError('Username must be at least ' + CONFIG.MIN_USERNAME_LENGTH + ' characters');
+                    return;
+                }
+
+                if (!password || password.length < CONFIG.MIN_PASSWORD_LENGTH) {
+                    showSignupError('Password must be at least ' + CONFIG.MIN_PASSWORD_LENGTH + ' characters');
+                    return;
+                }
+
+                if (password !== confirmPassword) {
+                    showSignupError('Passwords do not match');
+                    return;
+                }
+
+                try {
+                    DOM.signupBtn.disabled = true;
+                    DOM.signupBtn.textContent = 'Creating account...';
+
+                    const result = await callAPI('signup', {
+                        username: username,
+                        password: password,
+                        color: color
+                    });
+
+                    if (!result.success) {
+                        showSignupError(result.message || 'Username already taken');
+                        return;
+                    }
+
+                    const user = {
+                        username: username,
+                        password: password,
+                        color: color
+                    };
+
+                    AppState.currentUser = user;
+                    saveToStorage('user', user);
+                    AppState.notes = [];
+                    saveNotes();
+                    
+                    showApp();
+                    updateUIForUser();
+                    loadThemePreference();
+                    
+                    DOM.signupSuccess.textContent = 'Account created successfully!';
+                    DOM.signupSuccess.classList.add('show');
+                    showToast('Welcome ' + username + '!', 'success');
+                    
+                    if (AppState.isOnline) {
+                        await syncToCloud();
+                    }
+                    
+                    DOM.signupForm.reset();
+                    setTimeout(() => DOM.signupSuccess.classList.remove('show'), 3000);
+                } catch (e) {
+                    console.error('Signup error:', e);
+                    showSignupError('Server error. Please try again.');
+                } finally {
+                    DOM.signupBtn.disabled = false;
+                    DOM.signupBtn.innerHTML = `
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                            <circle cx="12" cy="7" r="4"/>
+                        </svg>
+                        Create Account
+                    `;
+                }
+            }
+
+            function showLoginError(message) {
+                DOM.loginError.textContent = message;
+                DOM.loginError.classList.add('show');
+                setTimeout(() => DOM.loginError.classList.remove('show'), 4000);
+            }
+
+            function showSignupError(message) {
+                DOM.signupError.textContent = message;
+                DOM.signupError.classList.add('show');
+                setTimeout(() => DOM.signupError.classList.remove('show'), 4000);
+            }
+
+            function handleLogout() {
+                if (!confirm('Logout? Your data will be saved.')) return;
+                
+                try {
+                    if (AppState.isOnline) {
+                        syncToCloud().then(() => completeLogout());
+                    } else {
+                        completeLogout();
+                    }
+                } catch (e) {
+                    completeLogout();
+                }
+            }
+
+            function completeLogout() {
+                stopAutoSync();
+                AppState.currentUser = null;
+                saveToStorage('user', null);
+                DOM.appContainer.classList.remove('visible');
+                DOM.authScreen.classList.remove('hidden');
+                DOM.loginForm.reset();
+                DOM.signupForm.reset();
+                showToast('Logged out', 'info');
+                switchToLogin();
+            }
+
+            // ---------- UI UPDATES ----------
+            function showApp() {
+                DOM.authScreen.classList.add('hidden');
+                DOM.appContainer.classList.add('visible');
+                document.documentElement.style.setProperty('--primary', AppState.currentUser.color);
+                startAutoSync();
+            }
+
+            function updateUIForUser() {
+                const user = AppState.currentUser;
+                if (!user) return;
+                
+                DOM.appTitle.textContent = user.username + "'s Journal";
+                DOM.userGreeting.textContent = 'Welcome back, ' + user.username + '!';
+                
+                const hour = new Date().getHours();
+                let greeting = 'Good Morning!';
+                if (hour >= 12 && hour < 17) greeting = 'Good Afternoon!';
+                else if (hour >= 17) greeting = 'Good Evening!';
+                DOM.greeting.textContent = greeting + ' ' + user.username + '!';
+                
+                document.documentElement.style.setProperty('--primary', user.color);
+                const metaTheme = document.querySelector('meta[name="theme-color"]');
+                if (metaTheme) metaTheme.content = user.color;
+            }
+
+            function loadThemePreference() {
+                try {
+                    const darkMode = getFromStorage('darkMode', false);
+                    AppState.isDarkMode = darkMode;
+                    if (darkMode) document.documentElement.setAttribute('data-theme', 'dark');
+                } catch (e) {}
+            }
+
+            function toggleTheme() {
+                AppState.isDarkMode = !AppState.isDarkMode;
+                document.documentElement.setAttribute('data-theme', AppState.isDarkMode ? 'dark' : 'light');
+                saveToStorage('darkMode', AppState.isDarkMode);
+                showToast(AppState.isDarkMode ? 'Dark mode' : 'Light mode', 'info');
+            }
+
+            // ---------- NOTES CRUD ----------
+            function loadNotes() {
+                try {
+                    const notes = getFromStorage('notes_' + AppState.currentUser.username, []);
+                    AppState.notes = Array.isArray(notes) ? notes : [];
+                    renderHome();
+                    updateStats();
+                } catch (e) {
+                    AppState.notes = [];
+                }
+            }
+
+            function saveNotes() {
+                try {
+                    saveToStorage('notes_' + AppState.currentUser.username, AppState.notes);
+                    renderHome();
+                    updateStats();
+                    return true;
+                } catch (e) {
+                    showToast('Error saving notes', 'error');
+                    return false;
+                }
+            }
+
+            function addNote(title, content, tags = [], isVoice = false) {
+                if (AppState.notes.length >= CONFIG.MAX_NOTES) {
+                    showToast('Max notes limit reached', 'warning');
+                    return null;
+                }
+
+                const note = {
+                    id: Date.now(),
+                    title: title || 'Untitled',
+                    content: content,
+                    tags: tags.slice(0, 10),
+                    isVoice: isVoice,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+                
+                AppState.notes.unshift(note);
+                saveNotes();
+                showToast('Note saved!', 'success');
+                return note;
+            }
+
+            function updateNote(id, updates) {
+                const index = AppState.notes.findIndex(n => n.id === id);
+                if (index === -1) return false;
+                
+                AppState.notes[index] = { 
+                    ...AppState.notes[index], 
+                    ...updates, 
+                    updatedAt: new Date().toISOString() 
+                };
+                saveNotes();
+                showToast('Note updated!', 'success');
+                return true;
+            }
+
+            function deleteNote(id) {
+                if (!confirm('Delete this note?')) return false;
+                AppState.notes = AppState.notes.filter(n => n.id !== id);
+                saveNotes();
+                showToast('Note deleted', 'info');
+                return true;
+            }
+
+            function searchNotes(query) {
+                if (!query || !query.trim()) return AppState.notes;
+                const q = query.toLowerCase().trim();
+                return AppState.notes.filter(n => 
+                    n.title.toLowerCase().includes(q) || 
+                    n.content.toLowerCase().includes(q) ||
+                    n.tags.some(t => t.toLowerCase().includes(q))
+                );
+            }
+
+            function calculateStreak() {
+                const notes = AppState.notes;
+                if (notes.length === 0) return 0;
+                
+                let streak = 0;
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                
+                const dates = notes.map(n => {
+                    const d = new Date(n.createdAt);
+                    d.setHours(0, 0, 0, 0);
+                    return d.getTime();
+                });
+                const uniqueDates = [...new Set(dates)].sort((a, b) => b - a);
+                
+                for (let i = 0; i < uniqueDates.length; i++) {
+                    const date = new Date(uniqueDates[i]);
+                    const checkDate = new Date(today);
+                    checkDate.setDate(checkDate.getDate() - i);
+                    if (date.toDateString() === checkDate.toDateString()) {
+                        streak++;
+                    } else {
+                        break;
+                    }
+                }
+                return streak;
+            }
+
+            function updateStats() {
+                const notes = AppState.notes || [];
+                const weekAgo = new Date();
+                weekAgo.setDate(weekAgo.getDate() - 7);
+                
+                const weekNotes = notes.filter(n => new Date(n.createdAt) > weekAgo);
+                const voiceNotes = notes.filter(n => n.isVoice);
+                
+                DOM.totalNotes.textContent = weekNotes.length + ' notes';
+                DOM.voiceNotesCount.textContent = voiceNotes.length;
+                DOM.streakCount.textContent = calculateStreak() + ' days';
+            }
+
+            // ---------- RENDER FUNCTIONS ----------
+            function renderHome() {
+                DOM.sectionTitle.textContent = 'Recent Entries';
+                DOM.viewAllBtn.style.display = 'inline-flex';
+                
+                const notes = AppState.notes || [];
+                
+                if (notes.length === 0) {
+                    DOM.contentArea.innerHTML = `
+                        <div class="card text-center" style="cursor:default;">
+                            <p class="text-secondary">No notes yet. Start your journal today!</p>
+                            <button class="btn-primary mt-1" id="startNoteBtn">Create First Note</button>
+                        </div>
+                    `;
+                    document.getElementById('startNoteBtn')?.addEventListener('click', () => openNoteModal());
+                    return;
+                }
+
+                const html = notes.slice(0, 5).map(note => `
+                    <div class="card" data-note-id="${note.id}">
+                        <div class="flex items-center justify-between mb-1">
+                            <span class="text-sm text-secondary">${note.isVoice ? '🎵' : '✏️'} ${formatTime(note.createdAt)}</span>
+                            <span class="text-xs text-light">${note.isVoice ? 'Voice' : 'Text'}</span>
+                        </div>
+                        <h4>${escapeHtml(note.title)}</h4>
+                        <p class="text-sm">${escapeHtml(note.content.substring(0, 100))}${note.content.length > 100 ? '...' : ''}</p>
+                        <div class="flex items-center justify-between mt-1">
+                            <div>${note.tags.map(tag => `<span class="tag">#${escapeHtml(tag)}</span>`).join('')}</div>
+                            <button class="btn-icon text-sm text-primary view-note-btn" data-id="${note.id}">View</button>
+                        </div>
+                    </div>
+                `).join('');
+
+                DOM.contentArea.innerHTML = html;
+
+                document.querySelectorAll('.view-note-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        openViewNote(parseInt(btn.dataset.id));
+                    });
+                });
+
+                document.querySelectorAll('.card[data-note-id]').forEach(card => {
+                    card.addEventListener('click', () => {
+                        openViewNote(parseInt(card.dataset.noteId));
+                    });
+                });
+            }
+
+            function renderJournal(filter = '') {
+                DOM.sectionTitle.textContent = 'All Journal Entries';
+                DOM.viewAllBtn.style.display = 'none';
+                
+                const notes = filter ? searchNotes(filter) : AppState.notes;
+                
+                DOM.contentArea.innerHTML = `
+                    <div class="flex gap-2 mb-2">
+                        <input type="text" id="searchInput" class="input-field" placeholder="Search notes..." style="flex:1" value="${escapeHtml(filter)}">
+                        <button class="btn-primary" id="searchBtn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="11" cy="11" r="8"/>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                            </svg>
+                        </button>
+                        ${filter ? `<button class="btn-secondary" id="clearSearchBtn">Clear</button>` : ''}
+                    </div>
+                    <div id="journalEntries"></div>
+                `;
+
+                const entriesContainer = document.getElementById('journalEntries');
+                
+                if (notes.length === 0) {
+                    entriesContainer.innerHTML = `<p class="text-center text-secondary mt-3">${filter ? 'No notes found' : 'No notes yet.'}</p>`;
+                    return;
+                }
+
+                const grouped = notes.reduce((acc, note) => {
+                    const date = new Date(note.createdAt).toDateString();
+                    if (!acc[date]) acc[date] = [];
+                    acc[date].push(note);
+                    return acc;
+                }, {});
+
+                entriesContainer.innerHTML = Object.entries(grouped).map(([date, notes]) => `
+                    <h4 class="mt-2 mb-1 text-secondary">${date}</h4>
+                    ${notes.map(note => `
+                        <div class="card" data-note-id="${note.id}">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-sm text-secondary">${note.isVoice ? '🎵' : '✏️'} ${formatTime(note.createdAt)}</span>
+                            </div>
+                            <h4>${escapeHtml(note.title)}</h4>
+                            <p class="text-sm">${escapeHtml(note.content.substring(0, 150))}${note.content.length > 150 ? '...' : ''}</p>
+                            <div class="mt-1">${note.tags.map(tag => `<span class="tag">#${escapeHtml(tag)}</span>`).join('')}</div>
+                        </div>
+                    `).join('')}
+                `).join('');
+
+                document.querySelectorAll('#journalEntries .card').forEach(card => {
+                    card.addEventListener('click', () => {
+                        openViewNote(parseInt(card.dataset.noteId));
+                    });
+                });
+
+                document.getElementById('searchBtn')?.addEventListener('click', () => {
+                    renderJournal(document.getElementById('searchInput').value);
+                });
+                document.getElementById('searchInput')?.addEventListener('keyup', (e) => {
+                    if (e.key === 'Enter') renderJournal(e.target.value);
+                });
+                document.getElementById('clearSearchBtn')?.addEventListener('click', () => renderJournal(''));
+            }
+
+            function renderStickyNotes() {
+                DOM.sectionTitle.textContent = 'Sticky Notes';
+                DOM.viewAllBtn.style.display = 'none';
+                
+                const stickies = getFromStorage('stickies_' + AppState.currentUser.username, []);
+                
+                DOM.contentArea.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <button class="btn-primary" id="addStickyBtn">+ Add Sticky</button>
+                    </div>
+                    <div class="sticky-grid">
+                        ${stickies.map((sticky, index) => `
+                            <div class="card sticky-${sticky.color || 'yellow'}" style="padding:12px; min-height:120px; cursor:default;">
+                                <p style="word-break:break-word;">${escapeHtml(sticky.content)}</p>
+                                <div class="flex items-center justify-between mt-1">
+                                    <span class="text-xs text-light">${new Date(sticky.createdAt).toLocaleString()}</span>
+                                    <button class="btn-icon delete-sticky" data-index="${index}">
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <line x1="18" y1="6" x2="6" y2="18"/>
+                                            <line x1="6" y1="6" x2="18" y2="18"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    ${stickies.length === 0 ? '<p class="text-center text-secondary mt-3">No sticky notes yet.</p>' : ''}
+                `;
+
+                document.getElementById('addStickyBtn')?.addEventListener('click', () => {
+                    const content = prompt('Enter sticky note:');
+                    if (content && content.trim()) {
+                        const colors = ['yellow', 'green', 'blue', 'pink'];
+                        const stickies = getFromStorage('stickies_' + AppState.currentUser.username, []);
+                        stickies.push({
+                            id: Date.now(),
+                            content: content.trim(),
+                            color: colors[Math.floor(Math.random() * colors.length)],
+                            createdAt: new Date().toISOString()
+                        });
+                        saveToStorage('stickies_' + AppState.currentUser.username, stickies);
+                        renderStickyNotes();
+                        showToast('Sticky note added!', 'success');
+                    }
+                });
+
+                document.querySelectorAll('.delete-sticky').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const index = parseInt(btn.dataset.index);
+                        const stickies = getFromStorage('stickies_' + AppState.currentUser.username, []);
+                        if (confirm('Delete sticky note?')) {
+                            stickies.splice(index, 1);
+                            saveToStorage('stickies_' + AppState.currentUser.username, stickies);
+                            renderStickyNotes();
+                            showToast('Sticky note deleted', 'info');
+                        }
+                    });
+                });
+            }
+
+            function renderSettings() {
+                DOM.sectionTitle.textContent = 'Settings';
+                DOM.viewAllBtn.style.display = 'none';
+                
+                const user = AppState.currentUser;
+                const noteCount = AppState.notes.length;
+                
+                DOM.contentArea.innerHTML = `
+                    <div class="card" style="cursor:default;">
+                        <h4>Profile</h4>
+                        <p><strong>Username:</strong> ${escapeHtml(user.username)}</p>
+                        <p><strong>Color:</strong> <span style="display:inline-block;width:20px;height:20px;border-radius:50%;background:${user.color};vertical-align:middle;"></span></p>
+                        <button class="btn-secondary mt-1" id="changeColorBtn">Change Theme Color</button>
+                    </div>
+                    <div class="card" style="cursor:default;">
+                        <h4>Cloud Sync</h4>
+                        <p class="text-sm text-secondary">${AppState.isOnline ? 'Online' : 'Offline'}</p>
+                        <button class="btn-secondary mt-1" id="syncNowBtn">Sync Now</button>
+                        <p class="text-xs text-light mt-1">Last sync: ${AppState.lastSyncTime ? new Date(AppState.lastSyncTime).toLocaleString() : 'Never'}</p>
+                    </div>
+                    <div class="card" style="cursor:default;">
+                        <h4>Data Management</h4>
+                        <p class="text-sm text-secondary">${noteCount} notes saved</p>
+                        <button class="btn-secondary" id="exportAllBtn">Export All Notes</button>
+                        <button class="btn-danger mt-1" id="clearAllBtn">Clear All Data</button>
+                    </div>
+                    <div class="card" style="cursor:default;">
+                        <h4>About</h4>
+                        <p>${CONFIG.APP_NAME} v${CONFIG.VERSION}</p>
+                        <p class="text-sm text-secondary">Created for ${escapeHtml(user.username)}</p>
+                    </div>
+                `;
+
+                document.getElementById('changeColorBtn')?.addEventListener('click', () => {
+                    const colors = ['#6C63FF', '#FF6584', '#4CAF50', '#FF9800', '#9C27B0', '#00BCD4'];
+                    const currentIndex = colors.indexOf(user.color);
+                    const nextColor = colors[(currentIndex + 1) % colors.length];
+                    user.color = nextColor;
+                    saveToStorage('user', user);
+                    updateUIForUser();
+                    renderSettings();
+                    showToast('Color updated!', 'success');
+                });
+
+                document.getElementById('syncNowBtn')?.addEventListener('click', async () => {
+                    showToast('Syncing...', 'info');
+                    await syncToCloud();
+                    await syncFromCloud();
+                    renderSettings();
+                });
+
+                document.getElementById('exportAllBtn')?.addEventListener('click', () => {
+                    const data = {
+                        app: CONFIG.APP_NAME,
+                        version: CONFIG.VERSION,
+                        username: AppState.currentUser.username,
+                        notes: AppState.notes,
+                        exportedAt: new Date().toISOString()
+                    };
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'voice_journal_backup_' + new Date().toISOString().split('T')[0] + '.json';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    showToast('Export successful!', 'success');
+                });
+
+                document.getElementById('clearAllBtn')?.addEventListener('click', () => {
+                    if (confirm('Delete ALL notes? This cannot be undone!')) {
+                        if (confirm('Are you absolutely sure?')) {
+                            AppState.notes = [];
+                            saveNotes();
+                            renderSettings();
+                            showToast('All data cleared', 'info');
+                        }
+                    }
+                });
+            }
+
+            // ---------- HELPERS ----------
+            function escapeHtml(text) {
+                if (!text) return '';
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            function formatTime(timestamp) {
+                const date = new Date(timestamp);
+                const now = new Date();
+                const diff = now - date;
+                if (diff < 60000) return 'Just now';
+                if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+                if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+                if (diff < 172800000) return 'Yesterday';
+                return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
+
+            function updateDateTime() {
+                const now = new Date();
+                DOM.currentDate.textContent = now.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            }
+
+            // ---------- MODALS ----------
+            function openNoteModal(noteData = null) {
+                DOM.noteModal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+                
+                if (noteData) {
+                    DOM.modalTitle.textContent = 'Edit Note';
+                    DOM.noteTitle.value = noteData.title;
+                    DOM.noteContent.value = noteData.content;
+                    DOM.noteTags.value = noteData.tags.join(', ');
+                    AppState.editingNoteId = noteData.id;
+                } else {
+                    DOM.modalTitle.textContent = 'New Note';
+                    DOM.noteForm.reset();
+                    AppState.editingNoteId = null;
+                }
+                setTimeout(() => DOM.noteTitle.focus(), 100);
+            }
+
+            function closeNoteModal() {
+                DOM.noteModal.classList.add('hidden');
+                document.body.style.overflow = '';
+                DOM.noteForm.reset();
+                AppState.editingNoteId = null;
+            }
+
+            function handleNoteSubmit(e) {
+                e.preventDefault();
+                
+                const title = DOM.noteTitle.value.trim() || 'Untitled';
+                const content = DOM.noteContent.value.trim();
+                const tags = DOM.noteTags.value.split(',').map(t => t.trim()).filter(t => t);
+                
+                if (!content) {
+                    showToast('Please add content.', 'warning');
+                    DOM.noteContent.focus();
+                    return;
+                }
+
+                if (AppState.editingNoteId) {
+                    updateNote(AppState.editingNoteId, { title, content, tags });
+                } else {
+                    addNote(title, content, tags, false);
+                }
+                
+                closeNoteModal();
+                refreshCurrentView();
+            }
+
+            function openViewNote(id) {
+                const note = AppState.notes.find(n => n.id === id);
+                if (!note) {
+                    showToast('Note not found', 'error');
+                    return;
+                }
+                
+                AppState.viewingNoteId = id;
+                DOM.viewNoteTitle.textContent = note.title;
+                DOM.viewNoteDate.textContent = 'Created: ' + new Date(note.createdAt).toLocaleString();
+                DOM.viewNoteText.textContent = note.content;
+                DOM.viewNoteTags.innerHTML = note.tags.map(tag => '<span class="tag">#' + escapeHtml(tag) + '</span>').join(' ');
+                DOM.viewNoteModal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeViewNote() {
+                DOM.viewNoteModal.classList.add('hidden');
+                document.body.style.overflow = '';
+                AppState.viewingNoteId = null;
+            }
+
+            function handleDeleteNote() {
+                if (!AppState.viewingNoteId) return;
+                if (deleteNote(AppState.viewingNoteId)) {
+                    closeViewNote();
+                    refreshCurrentView();
+                }
+            }
+
+            function handleEditNote() {
+                if (!AppState.viewingNoteId) return;
+                const note = AppState.notes.find(n => n.id === AppState.viewingNoteId);
+                if (note) {
+                    closeViewNote();
+                    openNoteModal(note);
+                }
+            }
+
+            function handleExportNote() {
+                if (!AppState.viewingNoteId) return;
+                const note = AppState.notes.find(n => n.id === AppState.viewingNoteId);
+                if (!note) return;
+
+                const content = [
+                    note.title,
+                    '='.repeat(40),
+                    'Created: ' + new Date(note.createdAt).toLocaleString(),
+                    '='.repeat(40),
+                    note.content,
+                    '='.repeat(40),
+                    'Tags: ' + note.tags.join(', '),
+                    'Exported from ' + CONFIG.APP_NAME
+                ].join('\n');
+
+                const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = note.title.replace(/\s+/g, '_') + '.txt';
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('Note exported!', 'success');
+            }
+
+            // ---------- VOICE RECORDING ----------
+            let mediaRecorder = null;
+            let audioChunks = [];
+            let recognition = null;
+
+            function toggleRecording() {
+                if (AppState.isRecording) {
+                    stopRecording();
+                } else {
+                    startRecording();
+                }
+            }
+
+            function startRecording() {
+                if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                    showToast('Speech recognition not supported. Use Chrome.', 'error');
+                    return;
+                }
+
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(stream => {
+                        mediaRecorder = new MediaRecorder(stream);
+                        audioChunks = [];
+                        mediaRecorder.ondataavailable = event => audioChunks.push(event.data);
+                        mediaRecorder.start();
+                        AppState.isRecording = true;
+                        DOM.recordBtn.classList.add('recording');
+
+                        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                        recognition = new SpeechRecognition();
+                        recognition.continuous = true;
+                        recognition.interimResults = true;
+                        recognition.lang = 'en-US';
+
+                        let transcript = '';
+                        recognition.onresult = (event) => {
+                            for (let i = event.resultIndex; i < event.results.length; i++) {
+                                if (event.results[i].isFinal) {
+                                    transcript += event.results[i][0].transcript + ' ';
+                                }
+                            }
+                            if (!DOM.noteModal.classList.contains('hidden')) {
+                                DOM.noteContent.value = transcript;
+                            }
+                        };
+
+                        recognition.start();
+                        showToast('Recording started...', 'info');
+                    })
+                    .catch(() => showToast('Microphone access denied.', 'error'));
+            }
+
+            function stopRecording() {
+                if (mediaRecorder && AppState.isRecording) {
+                    mediaRecorder.stop();
+                    mediaRecorder.onstop = () => {
+                        if (recognition) recognition.stop();
+                        AppState.isRecording = false;
+                        DOM.recordBtn.classList.remove('recording');
+                        openNoteModal();
+                        showToast('Recording stopped!', 'success');
+                    };
+                }
+            }
+
+            // ---------- NAVIGATION ----------
+            function navigateTo(page) {
+                AppState.currentPage = page;
+                DOM.navItems.forEach(n => n.classList.remove('active'));
+                const activeNav = document.querySelector('.nav-item[data-page="' + page + '"]');
+                if (activeNav) activeNav.classList.add('active');
+                
+                switch(page) {
+                    case 'home': renderHome(); break;
+                    case 'journal': renderJournal(); break;
+                    case 'sticky': renderStickyNotes(); break;
+                    case 'settings': renderSettings(); break;
+                }
+            }
+
+            function refreshCurrentView() {
+                navigateTo(AppState.currentPage);
+            }
+
+            // ---------- AUTH UI ----------
+            function switchToLogin() {
+                DOM.loginForm.classList.remove('hidden');
+                DOM.signupForm.classList.add('hidden');
+                DOM.authTabs.forEach(tab => {
+                    tab.classList.toggle('active', tab.dataset.tab === 'login');
+                    tab.setAttribute('aria-selected', tab.dataset.tab === 'login');
+                });
+            }
+
+            function switchToSignup() {
+                DOM.loginForm.classList.add('hidden');
+                DOM.signupForm.classList.remove('hidden');
+                DOM.authTabs.forEach(tab => {
+                    tab.classList.toggle('active', tab.dataset.tab === 'signup');
+                    tab.setAttribute('aria-selected', tab.dataset.tab === 'signup');
+                });
+            }
+
+            // ---------- ONLINE/OFFLINE ----------
+            function updateOnlineStatus() {
+                AppState.isOnline = navigator.onLine;
+                if (AppState.isOnline && AppState.currentUser) {
+                    syncFromCloud();
+                }
+                showToast(AppState.isOnline ? 'Back online' : 'Offline mode', 'info');
+            }
+
+            // ---------- INITIALIZATION ----------
+            function init() {
+                // Auth tabs
+                DOM.authTabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        tab.dataset.tab === 'login' ? switchToLogin() : switchToSignup();
+                    });
+                });
+
+                DOM.switchToSignup.addEventListener('click', switchToSignup);
+                DOM.switchToLogin.addEventListener('click', switchToLogin);
+
+                // Color picker
+                DOM.colorPicker.addEventListener('click', (e) => {
+                    const option = e.target.closest('.color-option');
+                    if (option) {
+                        document.querySelectorAll('.color-option').forEach(o => o.classList.remove('selected'));
+                        option.classList.add('selected');
+                    }
+                });
+
+                // Forms
+                DOM.loginForm.addEventListener('submit', handleLogin);
+                DOM.signupForm.addEventListener('submit', handleSignup);
+
+                // Buttons
+                DOM.logoutBtn.addEventListener('click', handleLogout);
+                DOM.themeToggle.addEventListener('click', toggleTheme);
+                DOM.recordBtn.addEventListener('click', toggleRecording);
+                DOM.voiceBtn.addEventListener('click', toggleRecording);
+                DOM.typeBtn.addEventListener('click', () => openNoteModal());
+
+                // Note modal
+                DOM.noteForm.addEventListener('submit', handleNoteSubmit);
+                DOM.closeModal.addEventListener('click', closeNoteModal);
+                DOM.cancelNote.addEventListener('click', closeNoteModal);
+
+                // View note modal
+                DOM.closeViewModal.addEventListener('click', closeViewNote);
+                DOM.editNoteBtn.addEventListener('click', handleEditNote);
+                DOM.deleteNoteBtn.addEventListener('click', handleDeleteNote);
+                DOM.exportNoteBtn.addEventListener('click', handleExportNote);
+
+                // View all
+                DOM.viewAllBtn.addEventListener('click', () => navigateTo('journal'));
+
+                // Navigation
+                DOM.navItems.forEach(item => {
+                    item.addEventListener('click', function() {
+                        navigateTo(this.dataset.page);
+                    });
+                });
+
+                // Close modals on overlay click
+                document.querySelectorAll('.modal-overlay').forEach(overlay => {
+                    overlay.addEventListener('click', function(e) {
+                        if (e.target === this) {
+                            this.classList.add('hidden');
+                            document.body.style.overflow = '';
+                        }
+                    });
+                });
+
+                // Keyboard shortcuts
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        closeNoteModal();
+                        closeViewNote();
+                    }
+                    if (e.ctrlKey && e.key === 'n') {
+                        e.preventDefault();
+                        if (DOM.appContainer.classList.contains('visible')) {
+                            openNoteModal();
+                        }
+                    }
+                });
+
+                // Online/Offline
+                window.addEventListener('online', updateOnlineStatus);
+                window.addEventListener('offline', updateOnlineStatus);
+
+                // Save on visibility change
+                document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'hidden' && AppState.currentUser) {
+                        saveToStorage('notes_' + AppState.currentUser.username, AppState.notes);
+                        if (AppState.isOnline) syncToCloud();
+                    }
+                });
+
+                // Initialize
+                updateDateTime();
+                setInterval(updateDateTime, 60000);
+
+                const hasUser = initializeAuth();
+                if (!hasUser) {
+                    DOM.authScreen.classList.remove('hidden');
+                    switchToLogin();
+                }
+
+                AppState.isInitialized = true;
+                console.log('🌟 ' + CONFIG.APP_NAME + ' v' + CONFIG.VERSION + ' loaded!');
+                console.log('📡 API URL:', CONFIG.API_URL);
+            }
+
+            // ---------- START ----------
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+
+        })();
+    </script>
+</body>
+</html>
