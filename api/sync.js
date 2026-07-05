@@ -1,19 +1,105 @@
-// api/sync.js - Serverless API endpoint for Vercel
+// api/sync.js - Complete working version
 
-// In-memory storage (resets on server restart - use a database in production)
-// For production, replace with MongoDB, PostgreSQL, or Vercel KV
-const userData = {};
+const JSONBIN_ACCESS_KEY = process.env.JSONBIN_ACCESS_KEY;
+const JSONBIN_BIN_ID = process.env.JSONBIN_BIN_ID;
+
+let cachedData = {};
+let lastCacheUpdate = null;
+const CACHE_TTL = 60000;
+
+async function fetchBinData() {
+    if (!JSONBIN_ACCESS_KEY || !JSONBIN_BIN_ID) {
+        throw new Error('JSONBin API keys not configured');
+    }
+
+    if (cachedData && lastCacheUpdate && 
+        (Date.now() - lastCacheUpdate) < CACHE_TTL) {
+        return cachedData;
+    }
+
+    try {
+        const response = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`, {
+            headers: {
+                'X-Access-Key': JSONBIN_ACCESS_KEY
+            }
+        });
+
+        if (response.status === 404) {
+            // Bin doesn't exist, create it
+            const createResponse = await fetch('https://api.jsonbin.io/v3/b', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Access-Key': JSONBIN_ACCESS_KEY
+                },
+                body: JSON.stringify({
+                    name: 'voice-journal-data',
+                    data: { users: {} }
+                })
+            });
+            
+            if (!createResponse.ok) {
+                throw new Error(`Failed to create bin: ${createResponse.status}`);
+            }
+            
+            const result = await createResponse.json();
+            console.log('Created new bin:', result.metadata?.id);
+            return { users: {} };
+        }
+
+        if (!response.ok) {
+            throw new Error(`JSONBin API error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        cachedData = result.record || { users: {} };
+        lastCacheUpdate = Date.now();
+        return cachedData;
+    } catch (error) {
+        console.error('Error fetching from JSONBin:', error);
+        throw error;
+    }
+}
+
+async function updateBinData(data) {
+    if (!JSONBIN_ACCESS_KEY || !JSONBIN_BIN_ID) {
+        throw new Error('JSONBin API keys not configured');
+    }
+
+    try {
+        const response = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Access-Key': JSONBIN_ACCESS_KEY
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            throw new Error(`JSONBin API error: ${response.status}`);
+        }
+
+        cachedData = data;
+        lastCacheUpdate = Date.now();
+        return await response.json();
+    } catch (error) {
+        console.error('Error updating JSONBin:', error);
+        throw error;
+    }
+}
 
 export default async function handler(req, res) {
-    // Only allow POST requests
     if (req.method !== 'POST') {
-        return res.status(405).json({ success: false, message: 'Method not allowed' });
+        return res.status(405).json({ 
+            success: false, 
+            message: 'Method not allowed' 
+        });
     }
 
     try {
         const { action, username, password, notes, stickies, color } = req.body;
 
-        // Validate required fields
         if (!username || !password) {
             return res.status(400).json({ 
                 success: false, 
@@ -21,45 +107,60 @@ export default async function handler(req, res) {
             });
         }
 
-        // Hash password (simple - use bcrypt in production)
+        let allUsers = { users: {} };
+        try {
+            const data = await fetchBinData();
+            allUsers = data || { users: {} };
+        } catch (error) {
+            allUsers = { users: {} };
+        }
+
+        if (typeof allUsers !== 'object' || Array.isArray(allUsers)) {
+            allUsers = { users: {} };
+        }
+
+        if (!allUsers.users) {
+            allUsers.users = {};
+        }
+
         const hashedPassword = hashPassword(password);
 
         switch (action) {
-            case 'signup':
-                // Check if user already exists
-                if (userData[username]) {
+            case 'signup': {
+                if (allUsers.users[username]) {
                     return res.status(400).json({ 
                         success: false, 
                         message: 'Username already taken' 
                     });
                 }
 
-                // Create new user
-                userData[username] = {
+                allUsers.users[username] = {
                     password: hashedPassword,
                     color: color || '#6C63FF',
                     notes: [],
                     stickies: [],
-                    createdAt: new Date().toISOString()
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
                 };
+
+                await updateBinData(allUsers);
 
                 return res.status(200).json({
                     success: true,
                     message: 'Account created successfully',
-                    data: { color: userData[username].color }
+                    data: { color: color || '#6C63FF' }
                 });
+            }
 
-            case 'login':
-                // Check if user exists
-                if (!userData[username]) {
+            case 'login': {
+                if (!allUsers.users[username]) {
                     return res.status(401).json({ 
                         success: false, 
                         message: 'Invalid username or password' 
                     });
                 }
 
-                // Verify password
-                if (userData[username].password !== hashedPassword) {
+                if (allUsers.users[username].password !== hashedPassword) {
                     return res.status(401).json({ 
                         success: false, 
                         message: 'Invalid username or password' 
@@ -69,37 +170,52 @@ export default async function handler(req, res) {
                 return res.status(200).json({
                     success: true,
                     message: 'Login successful',
-                    data: { color: userData[username].color }
+                    data: { color: allUsers.users[username].color }
                 });
+            }
 
-            case 'sync':
-                // Verify user exists
-                if (!userData[username] || userData[username].password !== hashedPassword) {
+            case 'sync': {
+                if (!allUsers.users[username]) {
+                    return res.status(401).json({ 
+                        success: false, 
+                        message: 'User not found' 
+                    });
+                }
+
+                if (allUsers.users[username].password !== hashedPassword) {
                     return res.status(401).json({ 
                         success: false, 
                         message: 'Authentication failed' 
                     });
                 }
 
-                // Update user data
-                if (notes !== undefined) userData[username].notes = notes;
-                if (stickies !== undefined) userData[username].stickies = stickies;
-                if (color !== undefined) userData[username].color = color;
-                userData[username].lastSync = new Date().toISOString();
+                if (notes !== undefined) allUsers.users[username].notes = notes;
+                if (stickies !== undefined) allUsers.users[username].stickies = stickies;
+                if (color !== undefined) allUsers.users[username].color = color;
+                allUsers.users[username].updatedAt = new Date().toISOString();
+
+                await updateBinData(allUsers);
 
                 return res.status(200).json({
                     success: true,
                     message: 'Synced successfully',
                     data: {
-                        notes: userData[username].notes,
-                        stickies: userData[username].stickies,
-                        color: userData[username].color
+                        notes: allUsers.users[username].notes || [],
+                        stickies: allUsers.users[username].stickies || [],
+                        color: allUsers.users[username].color || '#6C63FF'
                     }
                 });
+            }
 
-            case 'load':
-                // Verify user exists
-                if (!userData[username] || userData[username].password !== hashedPassword) {
+            case 'load': {
+                if (!allUsers.users[username]) {
+                    return res.status(401).json({ 
+                        success: false, 
+                        message: 'User not found' 
+                    });
+                }
+
+                if (allUsers.users[username].password !== hashedPassword) {
                     return res.status(401).json({ 
                         success: false, 
                         message: 'Authentication failed' 
@@ -110,11 +226,12 @@ export default async function handler(req, res) {
                     success: true,
                     message: 'Data loaded successfully',
                     data: {
-                        notes: userData[username].notes || [],
-                        stickies: userData[username].stickies || [],
-                        color: userData[username].color || '#6C63FF'
+                        notes: allUsers.users[username].notes || [],
+                        stickies: allUsers.users[username].stickies || [],
+                        color: allUsers.users[username].color || '#6C63FF'
                     }
                 });
+            }
 
             default:
                 return res.status(400).json({ 
@@ -132,14 +249,12 @@ export default async function handler(req, res) {
     }
 }
 
-// Simple password hashing (use bcrypt in production)
 function hashPassword(password) {
-    // This is a simple hash - use bcrypt for production
     let hash = 0;
     for (let i = 0; i < password.length; i++) {
         const char = password.charCodeAt(i);
         hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32bit integer
+        hash = hash & hash;
     }
     return 'hash_' + Math.abs(hash).toString(36);
 }
